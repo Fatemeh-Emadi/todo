@@ -142,27 +142,21 @@ class BotHandler
             error_log("BotHandler::handleRequest: 'from' field missing for non-start message. Update type might not be a user message.");
         }
 
-        $state = $this->db->getUserState($this->chatId) ?? 'default';
-        $userLanguage = $this->db->getUserLanguage($this->chatId);
-error_log(print_r($state,true));
-error_log(print_r($userLanguage,true));
+        // $state = $this->db->getUserState($this->chatId) ?? 'default';
+        // $userLanguage = $this->db->getUserLanguage($this->chatId);
+
+
+
         // Handle task input
-        if ($state === 'awaiting_task_text' && isset($this->message["text"])) {
+      
             $this->createTask($this->message["text"]);
-            $this->db->updateUserState($this->chatId, 'default');
+            // $this->db->updateUserState($this->chatId, 'default');
             $this->sendRequest("sendMessage", [
                 "chat_id" => $this->chatId,
                 "text" => $userLanguage === 'fa' ? "وظیفه با موفقیت ثبت شد!" : "Task created successfully!",
                 "reply_markup" => $this->getMainKeyboard($userLanguage)
             ]);
-        } else {
-            // Show main menu with buttons
-            $this->sendRequest("sendMessage", [
-                "chat_id" => $this->chatId,
-                "text" => $userLanguage === 'fa' ? "لطفاً یک گزینه را انتخاب کنید:" : "Please choose an option:",
-                "reply_markup" => $this->getMainKeyboard($userLanguage)
-            ]);
-        }
+    
     }
 
     private function getMainKeyboard($language): string
