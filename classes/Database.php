@@ -240,6 +240,55 @@ class Database
         return $stmt->get_result()->fetch_assoc();
     }
 
+
+     public function insertTask($chatId, $taskText, $createdAt)
+    {
+        $stmt = $this->mysqli->prepare("INSERT INTO tasks (telegram_id, task_text, created_at) VALUES (?, ?, ?)");
+        if (!$stmt) {
+            error_log("❌ Failed to prepare statement in insertTask: " . $this->mysqli->error);
+            return false;
+        }
+
+        $stmt->bind_param("iss", $chatId, $taskText, $createdAt);
+        if (!$stmt->execute()) {
+            error_log("❌ Failed to execute statement in insertTask: " . $stmt->error);
+            $stmt->close();
+            return false;
+        }
+
+        $affectedRows = $stmt->affected_rows;
+        $stmt->close();
+
+        return $affectedRows > 0;
+    }
+
+    public function getTasksByChatId($chatId)
+    {
+        $stmt = $this->mysqli->prepare("SELECT task_text, created_at FROM tasks WHERE telegram_id = ? ORDER BY created_at DESC");
+        if (!$stmt) {
+            error_log("❌ Failed to prepare statement in getTasksByChatId: " . $this->mysqli->error);
+            return [];
+        }
+
+        $stmt->bind_param("i", $chatId);
+        if (!$stmt->execute()) {
+            error_log("❌ Failed to execute statement in getTasksByChatId: " . $stmt->error);
+            $stmt->close();
+            return [];
+        }
+
+        $result = $stmt->get_result();
+        $tasks = $result->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
+        return $tasks;
+    }
+    
+
 }
 
 ?>
+
+
+
+
