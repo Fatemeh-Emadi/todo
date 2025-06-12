@@ -89,9 +89,6 @@ class BotHandler
     }
 
 
-
-
-
     public function handleCallbackQuery($callbackQuery): void
     {
         $callbackData = $callbackQuery["data"] ?? null;
@@ -123,8 +120,8 @@ class BotHandler
             error_log("BotHandler::handleRequest: 'from' field missing for non-start message. Update type might not be a user message.");
         }
         $state = $this->fileHandler->getState($this->chatId);
-
-        }
+        error_log(json_encode($this->message));
+    }
 
     public function sendRequest($method, $data)
     {
