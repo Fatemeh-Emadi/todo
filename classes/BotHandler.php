@@ -144,7 +144,8 @@ class BotHandler
 
         $state = $this->db->getUserState($this->chatId) ?? 'default';
         $userLanguage = $this->db->getUserLanguage($this->chatId);
-
+error_log(print_r($state,true));
+error_log(print_r($userLanguage,true));
         // Handle task input
         if ($state === 'awaiting_task_text' && isset($this->message["text"])) {
             $this->createTask($this->message["text"]);
