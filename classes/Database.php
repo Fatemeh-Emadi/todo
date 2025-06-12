@@ -283,6 +283,47 @@ class Database
 
         return $tasks;
     }
+     public function getUserState($chatId)
+    {
+        $stmt = $this->mysqli->prepare("SELECT task_input_status FROM users WHERE chat_id = ?");
+        if (!$stmt) {
+            error_log("❌ Failed to prepare statement in getUserState: " . $this->mysqli->error);
+            return 'default';
+        }
+
+        $stmt->bind_param("i", $chatId);
+        if (!$stmt->execute()) {
+            error_log("❌ Failed to execute statement in getUserState: " . $stmt->error);
+            $stmt->close();
+            return 'default';
+        }
+
+        $result = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        return $result['task_input_status'] ?? 'default';
+    }
+
+    public function updateUserState($chatId, $state)
+    {
+        $stmt = $this->mysqli->prepare("UPDATE users SET task_input_status = ? WHERE chat_id = ?");
+        if (!$stmt) {
+            error_log("❌ Failed to prepare statement in updateUserState: " . $this->mysqli->error);
+            return false;
+        }
+
+        $stmt->bind_param("si", $state, $chatId);
+        if (!$stmt->execute()) {
+            error_log("❌ Failed to execute statement in updateUserState: " . $stmt->error);
+            $stmt->close();
+            return false;
+        }
+
+        $affectedRows = $stmt->affected_rows;
+        $stmt->close();
+
+        return $affectedRows > 0;
+    }
     
 
 }
