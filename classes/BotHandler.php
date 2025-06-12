@@ -89,7 +89,7 @@ class BotHandler
     }
 
 
-    public function handleCallbackQuery($callbackQuery): void
+   public function handleCallbackQuery($callbackQuery): void
     {
         $callbackData = $callbackQuery["data"] ?? null;
         $chatId = $callbackQuery["message"]["chat"]["id"] ?? null;
@@ -98,7 +98,7 @@ class BotHandler
         $currentKeyboard = $callbackQuery["message"]["reply_markup"]["inline_keyboard"] ?? [];
         $userLanguage = $this->db->getUserLanguage($this->chatId);
 
-        $user = $this->message['from'] ?? $this->callbackQuery['from'] ?? null;
+        $user = $this->message['from'] ?? $callbackQuery['from'] ?? null;
 
         if ($user !== null) {
             $this->db->saveUser($user);
@@ -110,6 +110,28 @@ class BotHandler
             error_log("Callback query missing required data.");
             return;
         }
+
+        // Handle task-related callback queries
+        switch ($callbackData) {
+            case 'create_task':
+                $this->db->updateUserState($this->chatId, 'awaiting_task_text');
+                $this->sendRequest("sendMessage", [
+                    "chat_id" => $chatId,
+                    "text" => $userLanguage === 'fa' ? "لطفاً متن وظیفه را وارد کنید:" : "Please enter the task text:",
+                    "reply_markup" => json_encode(["force_reply" => true])
+                ]);
+                break;
+            case 'list_tasks':
+                $this->showTaskList($chatId, $userLanguage);
+                break;
+            default:
+                error_log("Unknown callback data: $callbackData");
+        }
+
+        // Answer the callback query to remove the loading state
+        $this->sendRequest("answerCallbackQuery", [
+            "callback_query_id" => $callbackQueryId
+        ]);
     }
 
     public function handleRequest(): void
@@ -119,10 +141,71 @@ class BotHandler
         } else {
             error_log("BotHandler::handleRequest: 'from' field missing for non-start message. Update type might not be a user message.");
         }
-        $state = $this->fileHandler->getState($this->chatId);
-        
-        error_log(json_encode($this->message));
+
+        $state = $this->db->getUserState($this->chatId) ?? 'default';
+        $userLanguage = $this->db->getUserLanguage($this->chatId);
+
+        // Handle task input
+        if ($state === 'awaiting_task_text' && isset($this->message["text"])) {
+            $this->createTask($this->message["text"]);
+            $this->db->updateUserState($this->chatId, 'default');
+            $this->sendRequest("sendMessage", [
+                "chat_id" => $this->chatId,
+                "text" => $userLanguage === 'fa' ? "وظیفه با موفقیت ثبت شد!" : "Task created successfully!",
+                "reply_markup" => $this->getMainKeyboard($userLanguage)
+            ]);
+        } else {
+            // Show main menu with buttons
+            $this->sendRequest("sendMessage", [
+                "chat_id" => $this->chatId,
+                "text" => $userLanguage === 'fa' ? "لطفاً یک گزینه را انتخاب کنید:" : "Please choose an option:",
+                "reply_markup" => $this->getMainKeyboard($userLanguage)
+            ]);
+        }
     }
+
+    private function getMainKeyboard($language): string
+    {
+        $keyboard = [
+            "inline_keyboard" => [
+                [
+                    ["text" => $language === 'fa' ? "ایجاد وظیفه" : "Create Task", "callback_data" => "create_task"],
+                    ["text" => $language === 'fa' ? "لیست وظایف" : "List of Tasks", "callback_data" => "list_tasks"]
+                ]
+            ]
+        ];
+        return json_encode($keyboard);
+    }
+
+    private function createTask($taskText): void
+    {
+        $this->db->insertTask($this->chatId, $taskText, $this->jdate('Y/m/d H:i:s'));
+    }
+
+    private function showTaskList($chatId, $language): void
+    {
+        $tasks = $this->db->getTasksByChatId($chatId);
+        if (empty($tasks)) {
+            $this->sendRequest("sendMessage", [
+                "chat_id" => $chatId,
+                "text" => $language === 'fa' ? "هیچ وظیفه‌ای یافت نشد." : "No tasks found.",
+                "reply_markup" => $this->getMainKeyboard($language)
+            ]);
+            return;
+        }
+
+        $taskList = $language === 'fa' ? "لیست وظایف شما:\n" : "Your task list:\n";
+        foreach ($tasks as $index => $task) {
+            $taskList .= ($index + 1) . ". " . $task['task_text'] . " (" . $task['created_at'] . ")\n";
+        }
+
+        $this->sendRequest("sendMessage", [
+            "chat_id" => $chatId,
+            "text" => $taskList,
+            "reply_markup" => $this->getMainKeyboard($language)
+        ]);
+    }
+
 
     public function sendRequest($method, $data)
     {
